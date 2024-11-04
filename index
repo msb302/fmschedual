@@ -1,0 +1,311 @@
+import React, { useState } from 'react';
+import { Plus, Trash2, Save, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+
+const FamilySchedule = () => {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [activities, setActivities] = useState({});
+  const [viewMode, setViewMode] = useState('day'); // 'day', 'week', or 'month'
+  const [newActivity, setNewActivity] = useState({
+    time: '',
+    activity: '',
+    location: '',
+    assignedTo: ''
+  });
+
+  // Get dates for week view
+  const getWeekDates = () => {
+    const dates = [];
+    const currentDate = new Date(selectedDate);
+    currentDate.setDate(currentDate.getDate() - currentDate.getDay()); // Start from Sunday
+    
+    for (let i = 0; i < 7; i++) {
+      dates.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return dates;
+  };
+
+  // Get dates for month view
+  const getMonthDates = () => {
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const days = [];
+    
+    for (let i = 0; i < firstDay.getDay(); i++) {
+      days.push(null);
+    }
+    
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      days.push(new Date(year, month, day));
+    }
+    
+    return days;
+  };
+
+  const navigate = (amount, unit = 'day') => {
+    const newDate = new Date(selectedDate);
+    switch (unit) {
+      case 'day':
+        newDate.setDate(newDate.getDate() + amount);
+        break;
+      case 'week':
+        newDate.setDate(newDate.getDate() + (amount * 7));
+        break;
+      case 'month':
+        newDate.setMonth(newDate.getMonth() + amount);
+        break;
+    }
+    setSelectedDate(newDate);
+  };
+
+  const addActivity = () => {
+    if (newActivity.time && newActivity.activity && newActivity.location && newActivity.assignedTo) {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const updatedActivities = {
+        ...activities,
+        [dateStr]: [...(activities[dateStr] || []), { ...newActivity, id: Date.now() }]
+      };
+      setActivities(updatedActivities);
+      setNewActivity({ time: '', activity: '', location: '', assignedTo: '' });
+    }
+  };
+
+  const removeActivity = (dateStr, id) => {
+    setActivities({
+      ...activities,
+      [dateStr]: activities[dateStr].filter(activity => activity.id !== id)
+    });
+  };
+
+  const formatDate = (date, format = 'full') => {
+    if (!date) return '';
+    switch (format) {
+      case 'full':
+        return date.toLocaleDateString('en-US', { 
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      case 'short':
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        });
+      case 'weekday':
+        return date.toLocaleDateString('en-US', { weekday: 'short' });
+      default:
+        return date.toLocaleDateString();
+    }
+  };
+
+  const renderDayView = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <Button onClick={() => navigate(-1)} variant="ghost">
+          <ChevronLeft />
+        </Button>
+        <span className="text-lg font-semibold">{formatDate(selectedDate)}</span>
+        <Button onClick={() => navigate(1)} variant="ghost">
+          <ChevronRight />
+        </Button>
+      </div>
+      {activities[selectedDate.toISOString().split('T')[0]]?.sort((a, b) => 
+        a.time.localeCompare(b.time)
+      ).map((activity) => (
+        <div 
+          key={activity.id}
+          className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
+        >
+          <div className="font-semibold text-gray-700">{activity.time}</div>
+          <div className="font-medium text-gray-900 md:col-span-2">{activity.activity}</div>
+          <div className="text-gray-600">📍 {activity.location}</div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-gray-600">👥 {activity.assignedTo}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => removeActivity(selectedDate.toISOString().split('T')[0], activity.id)}
+              className="text-red-500 hover:text-red-700"
+            >
+              <Trash2 size={16} />
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderWeekView = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <Button onClick={() => navigate(-1, 'week')} variant="ghost">
+          <ChevronLeft />
+        </Button>
+        <span className="text-lg font-semibold">
+          Week of {formatDate(getWeekDates()[0], 'short')}
+        </span>
+        <Button onClick={() => navigate(1, 'week')} variant="ghost">
+          <ChevronRight />
+        </Button>
+      </div>
+      <div className="grid grid-cols-7 gap-2">
+        {getWeekDates().map((date) => (
+          <div
+            key={date.toISOString()}
+            className="border rounded-lg p-2 min-h-40 cursor-pointer hover:bg-gray-50"
+            onClick={() => {
+              setSelectedDate(date);
+              setViewMode('day');
+            }}
+          >
+            <div className="text-center mb-2">
+              <div className="font-bold">{formatDate(date, 'weekday')}</div>
+              <div>{formatDate(date, 'short')}</div>
+            </div>
+            {activities[date.toISOString().split('T')[0]]?.map((activity) => (
+              <div
+                key={activity.id}
+                className="text-xs p-1 mb-1 bg-blue-100 rounded truncate"
+              >
+                {activity.time} - {activity.activity}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderMonthView = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <Button onClick={() => navigate(-1, 'month')} variant="ghost">
+          <ChevronLeft />
+        </Button>
+        <span className="text-lg font-semibold">
+          {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </span>
+        <Button onClick={() => navigate(1, 'month')} variant="ghost">
+          <ChevronRight />
+        </Button>
+      </div>
+      <div className="grid grid-cols-7 gap-2">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <div key={day} className="text-center font-bold p-2">{day}</div>
+        ))}
+        {getMonthDates().map((date, index) => (
+          <div
+            key={index}
+            className={`border rounded-lg p-2 min-h-24 ${
+              date ? 'cursor-pointer hover:bg-gray-50' : ''
+            }`}
+            onClick={() => {
+              if (date) {
+                setSelectedDate(date);
+                setViewMode('day');
+              }
+            }}
+          >
+            {date && (
+              <>
+                <div className="text-right">{date.getDate()}</div>
+                {activities[date.toISOString().split('T')[0]]?.length > 0 && (
+                  <div className="mt-1 text-xs text-blue-600 font-semibold">
+                    {activities[date.toISOString().split('T')[0]].length} activities
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <Card className="w-full max-w-6xl">
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold text-center">Family Schedule</CardTitle>
+        <div className="flex justify-center gap-2 mt-4">
+          <Button
+            onClick={() => setViewMode('day')}
+            variant={viewMode === 'day' ? 'default' : 'outline'}
+            className={viewMode === 'day' ? 'bg-blue-600 text-white' : ''}
+          >
+            Day
+          </Button>
+          <Button
+            onClick={() => setViewMode('week')}
+            variant={viewMode === 'week' ? 'default' : 'outline'}
+            className={viewMode === 'week' ? 'bg-blue-600 text-white' : ''}
+          >
+            Week
+          </Button>
+          <Button
+            onClick={() => setViewMode('month')}
+            variant={viewMode === 'month' ? 'default' : 'outline'}
+            className={viewMode === 'month' ? 'bg-blue-600 text-white' : ''}
+          >
+            Month
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {/* View Modes */}
+          {viewMode === 'day' && renderDayView()}
+          {viewMode === 'week' && renderWeekView()}
+          {viewMode === 'month' && renderMonthView()}
+
+          {/* Add New Activity Form - Only shown in day view */}
+          {viewMode === 'day' && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+              <input
+                type="time"
+                value={newActivity.time}
+                onChange={(e) => setNewActivity({ ...newActivity, time: e.target.value })}
+                className="p-2 border rounded"
+                placeholder="Time"
+              />
+              <input
+                type="text"
+                value={newActivity.activity}
+                onChange={(e) => setNewActivity({ ...newActivity, activity: e.target.value })}
+                className="p-2 border rounded"
+                placeholder="Activity"
+              />
+              <input
+                type="text"
+                value={newActivity.location}
+                onChange={(e) => setNewActivity({ ...newActivity, location: e.target.value })}
+                className="p-2 border rounded"
+                placeholder="Location"
+              />
+              <input
+                type="text"
+                value={newActivity.assignedTo}
+                onChange={(e) => setNewActivity({ ...newActivity, assignedTo: e.target.value })}
+                className="p-2 border rounded"
+                placeholder="Assigned To"
+              />
+              <Button 
+                onClick={addActivity}
+                className="md:col-span-4 bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2"
+              >
+                <Plus size={16} /> Add Activity
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default FamilySchedule;
